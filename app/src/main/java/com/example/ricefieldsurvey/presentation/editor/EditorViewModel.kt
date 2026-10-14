@@ -81,7 +81,10 @@ class EditorViewModel(
     }
 
     fun saveAndLeave(onSaved: () -> Unit) {
-        val current = _uiState.value.interview ?: return
+        val current = _uiState.value.interview ?: run {
+            onSaved()
+            return
+        }
         autosaveJob?.cancel()
         if (current.status == InterviewStatus.COMPLETED) {
             onSaved()

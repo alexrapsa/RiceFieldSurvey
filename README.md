@@ -120,7 +120,16 @@ New-Item -ItemType Directory -Force app/debug-apk
 Copy-Item app/build/outputs/apk/debug/app-debug.apk app/debug-apk/rice-field-survey-debug.apk
 ```
 
-For a release submission, the assessment explicitly accepts a debug-signed APK.
+Install the built APK directly onto an Android phone by copying
+`app/debug-apk/rice-field-survey-debug.apk` to the device, opening it in the phone's
+file manager, and allowing installation from that source when prompted. Alternatively,
+connect a phone with USB debugging enabled and run:
+
+```bash
+adb install -r app/debug-apk/rice-field-survey-debug.apk
+```
+
+For assessment submission, a debug-signed APK is explicitly accepted.
 The app itself never needs network connectivity once installed.
 
 ### Build without local Android tooling (GitHub Actions)
