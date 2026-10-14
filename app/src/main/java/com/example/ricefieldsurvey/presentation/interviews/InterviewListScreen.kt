@@ -1,11 +1,16 @@
 package com.example.ricefieldsurvey.presentation.interviews
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
@@ -21,24 +27,35 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.example.ricefieldsurvey.domain.model.Interview
 import com.example.ricefieldsurvey.domain.model.InterviewStatus
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
+import androidx.compose.foundation.layout.offset
 
 @Composable
 fun InterviewListScreen(
@@ -46,10 +63,24 @@ fun InterviewListScreen(
     interviews: List<Interview>,
     onNew: () -> Unit,
     onOpen: (String) -> Unit,
+    onDeleteDraft: (String) -> Unit,
+    deletionFeedback: String?,
+    onFeedbackShown: () -> Unit,
     onLogout: () -> Unit,
 ) {
-    var search by rememberSaveable { mutableStateOf("") }
-    var tab by rememberSaveable { mutableStateOf("All") }
+    var search by rememberSaveable(userId) { mutableStateOf("") }
+    var tab by rememberSaveable(userId) { mutableStateOf("All") }
+    var pendingDeletion by remember { mutableStateOf<Interview?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(deletionFeedback) {
+        if (deletionFeedback != null) {
+            // A Room Flow refresh will remove the deleted draft without manual list mutation.
+            snackbarHostState.showSnackbar(deletionFeedback)
+            onFeedbackShown()
+        }
+    }
+
     val filtered = interviews.filter { interview ->
         (tab == "All" || (tab == "Drafts" && interview.status == InterviewStatus.DRAFT) ||
             (tab == "Completed" && interview.status == InterviewStatus.COMPLETED)) &&
@@ -57,7 +88,29 @@ fun InterviewListScreen(
                 interview.municipality.contains(search, ignoreCase = true))
     }
 
+    // A swipe only reveals the Delete action; deletion requires a tap and confirmation.
+    pendingDeletion?.let { interview ->
+        AlertDialog(
+            onDismissRequest = { pendingDeletion = null },
+            title = { Text("Delete saved draft?") },
+            text = {
+                Text("Delete the draft for ${interview.farmerName.ifBlank { "Unnamed farmer" }}? " +
+                    "This permanently removes the locally saved interview and cannot be undone.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingDeletion = null
+                    onDeleteDraft(interview.id)
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeletion = null }) { Text("Cancel") }
+            },
+        )
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(onClick = onNew, containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary) {
@@ -130,16 +183,91 @@ fun InterviewListScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                    contentPadding = PaddingValues(
                         start = 16.dp, end = 16.dp, bottom = 110.dp, top = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(filtered, key = { it.id }) { interview ->
-                        InterviewCard(interview) { onOpen(interview.id) }
+                        SwipeableInterviewRow(
+                            interview = interview,
+                            onOpen = { onOpen(interview.id) },
+                            onDelete = { pendingDeletion = interview },
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SwipeableInterviewRow(
+    interview: Interview,
+    onOpen: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    if (interview.status == InterviewStatus.COMPLETED) {
+        InterviewCard(interview, onClick = onOpen)
+        return
+    }
+
+    val revealWidth = 104.dp
+    val revealWidthPx = with(LocalDensity.current) { revealWidth.toPx() }
+    var offsetPx by remember(interview.id) { mutableFloatStateOf(0f) }
+    var isDragging by remember(interview.id) { mutableStateOf(false) }
+    val animatedOffset by animateFloatAsState(
+        targetValue = offsetPx,
+        animationSpec = tween(durationMillis = 180),
+        label = "Draft delete action",
+    )
+
+    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))) {
+        // This action remains behind the row until it is swiped to the left.
+        Row(
+            modifier = Modifier.matchParentSize(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            Surface(
+                modifier = Modifier.width(revealWidth).fillMaxHeight().clickable(onClick = onDelete),
+                color = MaterialTheme.colorScheme.error,
+                contentColor = MaterialTheme.colorScheme.onError,
+                shape = RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp),
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text("Delete", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+
+        InterviewCard(
+            interview = interview,
+            onClick = {
+                // Opening is still possible after the action has been revealed.
+                if (offsetPx == 0f) onOpen() else offsetPx = 0f
+            },
+            modifier = Modifier
+                .offset { IntOffset((if (isDragging) offsetPx else animatedOffset).roundToInt(), 0) }
+                .pointerInput(interview.id, revealWidthPx) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { isDragging = true },
+                        onHorizontalDrag = { change, amount ->
+                            change.consume()
+                            offsetPx = (offsetPx + amount).coerceIn(-revealWidthPx, 0f)
+                        },
+                        onDragCancel = {
+                            isDragging = false
+                            offsetPx = 0f
+                        },
+                        onDragEnd = {
+                            isDragging = false
+                            offsetPx = if (offsetPx < -revealWidthPx * 0.4f) -revealWidthPx else 0f
+                        },
+                    )
+                },
+        )
     }
 }
 
@@ -157,9 +285,13 @@ private fun SummaryCount(label: String, value: Int, modifier: Modifier = Modifie
 }
 
 @Composable
-private fun InterviewCard(interview: Interview, onClick: () -> Unit) {
+private fun InterviewCard(
+    interview: Interview,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val completed = interview.status == InterviewStatus.COMPLETED
-    Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    Card(modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {

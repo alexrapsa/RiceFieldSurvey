@@ -10,6 +10,14 @@ class ObserveInterviewsUseCase(private val repository: InterviewRepository) {
     operator fun invoke(userId: String): Flow<List<Interview>> = repository.observeForEnumerator(userId)
 }
 
+/** A completed record or another enumerator's record must never be deleted. */
+class DeleteDraftUseCase(private val repository: InterviewRepository) {
+    suspend operator fun invoke(interviewId: String, enumeratorId: String): Boolean {
+        if (interviewId.isBlank() || enumeratorId.isBlank()) return false
+        return repository.deleteDraft(interviewId, enumeratorId)
+    }
+}
+
 class GetInterviewUseCase(private val repository: InterviewRepository) {
     suspend operator fun invoke(id: String): Interview? = repository.getById(id)
 }

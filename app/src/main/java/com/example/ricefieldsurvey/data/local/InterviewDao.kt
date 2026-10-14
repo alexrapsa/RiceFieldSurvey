@@ -14,6 +14,10 @@ interface InterviewDao {
     @Query("SELECT * FROM interviews WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): InterviewEntity?
 
+    /** Restrict deletion in SQL itself, even if the UI/use case is called incorrectly. */
+    @Query("DELETE FROM interviews WHERE id = :id AND enumeratorId = :userId AND status = 'DRAFT'")
+    suspend fun deleteDraft(id: String, userId: String): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: InterviewEntity)
 }

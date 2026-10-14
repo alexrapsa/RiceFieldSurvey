@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.example.ricefieldsurvey.data.local.SurveyDatabase
 import com.example.ricefieldsurvey.data.repository.LocalAuthRepository
 import com.example.ricefieldsurvey.data.repository.RoomInterviewRepository
+import com.example.ricefieldsurvey.domain.usecase.DeleteDraftUseCase
 import com.example.ricefieldsurvey.domain.usecase.GetInterviewUseCase
 import com.example.ricefieldsurvey.domain.usecase.LoginUseCase
 import com.example.ricefieldsurvey.domain.usecase.ObserveInterviewsUseCase
@@ -24,5 +25,6 @@ class SurveyContainer(context: Context) {
     val observeInterviews = ObserveInterviewsUseCase(interviewRepository)
     val getInterview = GetInterviewUseCase(interviewRepository)
     val saveDraft = SaveDraftUseCase(interviewRepository)
+    val deleteDraft = DeleteDraftUseCase(interviewRepository)
     val submitInterview = SubmitInterviewUseCase(interviewRepository)
 }

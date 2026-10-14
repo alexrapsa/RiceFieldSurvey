@@ -14,6 +14,9 @@ class RoomInterviewRepository(private val dao: InterviewDao) : InterviewReposito
 
     override suspend fun getById(interviewId: String): Interview? = dao.getById(interviewId)?.toDomain()
 
+    override suspend fun deleteDraft(interviewId: String, enumeratorId: String): Boolean =
+        dao.deleteDraft(interviewId, enumeratorId) > 0
+
     override suspend fun upsert(interview: Interview) {
         dao.upsert(interview.toEntity())
     }

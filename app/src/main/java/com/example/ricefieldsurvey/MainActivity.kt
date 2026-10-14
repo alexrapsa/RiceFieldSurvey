@@ -74,10 +74,13 @@ private fun SurveyRoot() {
                 } else {
                     val listing: InterviewsViewModel = viewModel(
                         key = "interviews-$userId",
-                        factory = InterviewsViewModel.Factory(container.observeInterviews),
+                        factory = InterviewsViewModel.Factory(
+                            container.observeInterviews, container.deleteDraft,
+                        ),
                     )
                     LaunchedEffect(userId) { listing.forUser(userId) }
                     val interviews by listing.interviews.collectAsStateWithLifecycle()
+                    val deletionFeedback by listing.deletionFeedback.collectAsStateWithLifecycle()
                     InterviewListScreen(
                         userId = userId,
                         interviews = interviews,
@@ -89,6 +92,9 @@ private fun SurveyRoot() {
                             activeInterviewId = id
                             route = "editor"
                         },
+                        onDeleteDraft = listing::deleteDraft,
+                        deletionFeedback = deletionFeedback,
+                        onFeedbackShown = listing::clearDeletionFeedback,
                         onLogout = authViewModel::logOut,
                     )
                 }

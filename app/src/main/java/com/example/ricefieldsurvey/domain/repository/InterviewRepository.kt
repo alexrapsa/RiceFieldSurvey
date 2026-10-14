@@ -7,4 +7,6 @@ interface InterviewRepository {
     fun observeForEnumerator(enumeratorId: String): Flow<List<Interview>>
     suspend fun getById(interviewId: String): Interview?
     suspend fun upsert(interview: Interview)
+    /** Deletes only a draft owned by the current enumerator. */
+    suspend fun deleteDraft(interviewId: String, enumeratorId: String): Boolean
 }

@@ -1,6 +1,5 @@
 package com.example.ricefieldsurvey.presentation.components
 
-import androidx.compose.foundation.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -77,7 +76,6 @@ fun TextQuestion(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChoiceQuestion(
     id: String,
@@ -119,7 +117,6 @@ fun YesNoQuestion(
     )
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MultipleChoiceQuestion(
     selected: Set<String>, onToggle: (String) -> Unit,
@@ -142,7 +139,7 @@ fun MultipleChoiceQuestion(
 
 @Composable
 fun ProvinceQuestion(value: String, onSelected: (String) -> Unit,
-    enabled: Boolean, error: String?) {
+                     enabled: Boolean, error: String?) {
     var showPicker by rememberSaveable { mutableStateOf(false) }
     Column {
         QuestionHeader("B1Q4", "Province", required = true, error = error)
