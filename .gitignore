@@ -1,0 +1,9 @@
+.gradle/
+.idea/
+**/build/
+local.properties
+*.iml
+.DS_Store
+captures/
+.externalNativeBuild/
+# Intentionally permit app/debug-apk/rice-field-survey-debug.apk if adding assessment APK.
